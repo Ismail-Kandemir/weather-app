@@ -31,22 +31,114 @@ function App() {
   const [darkMode, setDarkMode] = useState(true);
 
   useEffect(() => {
+  const initialCity = 'Istanbul';
+
+  const loadInitialWeather = async () => {
     if (!navigator.geolocation) {
-      fetchWeather(query);
+      setLoading(true);
+      setError('');
+
+      try {
+        const weatherRes = await fetch(
+          `${API_ROOT}/weather?q=${encodeURIComponent(initialCity)}&units=metric&appid=${API_KEY}&lang=tr`
+        );
+        if (!weatherRes.ok) {
+          throw new Error('Şehir bulunamadı. Lütfen başka bir isim deneyin.');
+        }
+        const weatherData = await weatherRes.json();
+
+        const forecastRes = await fetch(
+          `${API_ROOT}/forecast?q=${encodeURIComponent(initialCity)}&units=metric&appid=${API_KEY}&lang=tr`
+        );
+        if (!forecastRes.ok) {
+          throw new Error('Tahmin verisi alınamadı.');
+        }
+        const forecastData = await forecastRes.json();
+
+        setCurrent(weatherData);
+        setForecast(extractDailyForecast(forecastData.list));
+      } catch (err) {
+        setCurrent(null);
+        setForecast([]);
+        setError(err.message || 'Bir hata oluştu.');
+      } finally {
+        setLoading(false);
+      }
+
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
-        fetchWeatherByCoords(latitude, longitude);
+
+        setLoading(true);
+        setError('');
+
+        try {
+          const weatherRes = await fetch(
+            `${API_ROOT}/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${API_KEY}&lang=tr`
+          );
+          if (!weatherRes.ok) {
+            throw new Error('Konuma göre hava durumu alınamadı.');
+          }
+          const weatherData = await weatherRes.json();
+
+          const forecastRes = await fetch(
+            `${API_ROOT}/forecast?lat=${latitude}&lon=${longitude}&units=metric&appid=${API_KEY}&lang=tr`
+          );
+          if (!forecastRes.ok) {
+            throw new Error('Konuma göre tahmin verisi alınamadı.');
+          }
+          const forecastData = await forecastRes.json();
+
+          setCurrent(weatherData);
+          setForecast(extractDailyForecast(forecastData.list));
+          setQuery(weatherData.name);
+        } catch (err) {
+          setCurrent(null);
+          setForecast([]);
+          setError(err.message || 'Konumdan hava durumu alınırken bir hata oluştu.');
+        } finally {
+          setLoading(false);
+        }
       },
-      () => {
+      async () => {
         setError('Konum izni verilmedi. Şehir aratarak devam edebilirsin.');
-        fetchWeather(query);
+        setLoading(true);
+
+        try {
+          const weatherRes = await fetch(
+            `${API_ROOT}/weather?q=${encodeURIComponent(initialCity)}&units=metric&appid=${API_KEY}&lang=tr`
+          );
+          if (!weatherRes.ok) {
+            throw new Error('Şehir bulunamadı. Lütfen başka bir isim deneyin.');
+          }
+          const weatherData = await weatherRes.json();
+
+          const forecastRes = await fetch(
+            `${API_ROOT}/forecast?q=${encodeURIComponent(initialCity)}&units=metric&appid=${API_KEY}&lang=tr`
+          );
+          if (!forecastRes.ok) {
+            throw new Error('Tahmin verisi alınamadı.');
+          }
+          const forecastData = await forecastRes.json();
+
+          setCurrent(weatherData);
+          setForecast(extractDailyForecast(forecastData.list));
+        } catch (err) {
+          setCurrent(null);
+          setForecast([]);
+          setError(err.message || 'Bir hata oluştu.');
+        } finally {
+          setLoading(false);
+        }
       }
     );
-  }, []);
+  };
+
+  loadInitialWeather();
+}, []);
 
   const themeClass = current ? weatherStyles[current.weather[0].main] || 'clear' : 'clear';
 
