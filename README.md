@@ -18,7 +18,7 @@ Modern ve responsive bir hava durumu uygulaması. React ile geliştirildi. Kulla
 - CSS
 - OpenWeather API
 
-Canlı Demo
+[Live Demo](https://weather-app-sandy-theta-10.vercel.app)
 
 Geliştirici
 
