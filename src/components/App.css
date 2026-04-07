@@ -84,12 +84,6 @@
   background: rgba(255, 255, 255, 0.24);
 }
 
-
-
-.search-form input::placeholder {
-  color: rgba(255, 255, 255, 0.72);
-}
-
 .search-form {
   display: grid;
   grid-template-columns: 1fr auto auto;
