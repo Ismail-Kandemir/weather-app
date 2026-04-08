@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { WeatherResponse, ForecastItem, OpenWeatherListItem } from '../types/weather';
-import { loadWeather, getWeatherUrl, getForecastUrl, getWeatherByCoordsUrl, getForecastByCoordsUrl } from '../services/weatherService';
+import {
+  loadWeather,
+  getWeatherUrl,
+  getForecastUrl,
+  getWeatherByCoordsUrl,
+  getForecastByCoordsUrl,
+} from '../services/weatherService';
 
 export const useWeather = () => {
   const [query, setQuery] = useState<string>('Istanbul');
@@ -9,15 +15,19 @@ export const useWeather = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
+  const hasInitialized = useRef(false); // YENİ
+
   const extractDailyForecast = (list: OpenWeatherListItem[]): ForecastItem[] => {
     const days: Record<string, OpenWeatherListItem[]> = {};
 
     list.forEach((item) => {
       const date = new Date(item.dt * 1000);
       const dayKey = date.toISOString().split('T')[0];
+
       if (!days[dayKey]) {
         days[dayKey] = [];
       }
+
       days[dayKey].push(item);
     });
 
@@ -76,59 +86,73 @@ export const useWeather = () => {
     []
   );
 
-  const fetchWeather = useCallback(async (city: string) => {
-    const weatherUrl = getWeatherUrl(city);
-    const forecastUrl = getForecastUrl(city);
+  const fetchWeather = useCallback(
+    async (city: string) => {
+      const weatherUrl = getWeatherUrl(city);
+      const forecastUrl = getForecastUrl(city);
 
-    return fetchWeatherData(weatherUrl, forecastUrl);
-  }, [fetchWeatherData]);
+      return fetchWeatherData(weatherUrl, forecastUrl);
+    },
+    [fetchWeatherData]
+  );
 
-  const fetchWeatherByCoords = useCallback(async (lat: number, lon: number) => {
-    const weatherUrl = getWeatherByCoordsUrl(lat, lon);
-    const forecastUrl = getForecastByCoordsUrl(lat, lon);
+  const fetchWeatherByCoords = useCallback(
+    async (lat: number, lon: number) => {
+      const weatherUrl = getWeatherByCoordsUrl(lat, lon);
+      const forecastUrl = getForecastByCoordsUrl(lat, lon);
 
-    return fetchWeatherData(weatherUrl, forecastUrl, true);
-  }, [fetchWeatherData]);
+      return fetchWeatherData(weatherUrl, forecastUrl, true);
+    },
+    [fetchWeatherData]
+  );
+
+  
+  const getCurrentPositionAsync = (): Promise<GeolocationPosition> => {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject);
+    });
+  };
 
   useEffect(() => {
+    if (hasInitialized.current) return; // YENİ
+    hasInitialized.current = true; // YENİ
+
     const initialCity = 'Istanbul';
 
     const loadInitialWeather = async () => {
-      if (!navigator.geolocation) {
-        await fetchWeather(initialCity);
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          await fetchWeatherByCoords(latitude, longitude);
-        },
-        async () => {
-          setError('Konum izni verilmedi. Şehir aratarak devam edebilirsin.');
+      try {
+        if (!navigator.geolocation) {
           await fetchWeather(initialCity);
+          return;
         }
-      );
+
+        const position = await getCurrentPositionAsync(); // DEĞİŞTİ
+        const { latitude, longitude } = position.coords;
+
+        await fetchWeatherByCoords(latitude, longitude);
+      } catch {
+        setError('Konum izni verilmedi. Şehir aratarak devam edebilirsin.');
+        await fetchWeather(initialCity);
+      }
     };
 
     loadInitialWeather();
   }, [fetchWeather, fetchWeatherByCoords]);
 
-  const handleUseMyLocation = () => {
+  const handleUseMyLocation = async () => {
     if (!navigator.geolocation) {
       setError('Tarayıcın konum özelliğini desteklemiyor.');
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        fetchWeatherByCoords(latitude, longitude);
-      },
-      () => {
-        setError('Konum alınamadı.');
-      }
-    );
+    try {
+      setError('');
+      const position = await getCurrentPositionAsync(); // DEĞİŞTİ
+      const { latitude, longitude } = position.coords;
+      await fetchWeatherByCoords(latitude, longitude);
+    } catch {
+      setError('Konum alınamadı.');
+    }
   };
 
   return {
